@@ -1,0 +1,274 @@
+erDiagram
+    %% =========================================================================
+    %% 🩸 HemoSync — Complete Entity-Relationship (ER) Architecture (BCNF)
+    %% PostgreSQL 16+ Relational Model with Crow's Foot Cardinality
+    %% =========================================================================
+
+    %% -------------------------------------------------------------------------
+    %% 1. FACILITY & IDENTITY MODULE (BLUE)
+    %% -------------------------------------------------------------------------
+    INSTITUTION {
+        uuid id PK "Primary Key"
+        varchar name "Facility Name"
+        enum type "HOSPITAL | BLOOD_BANK"
+        text address "Physical Street Address"
+        float latitude "GPS Latitude [-90, +90]"
+        float longitude "GPS Longitude [-180, +180]"
+        varchar license_number UK "State Health License ID"
+        varchar phone "Emergency Contact Number"
+        varchar email "Administrative Email"
+        enum verification_status "PENDING | VERIFIED | REJECTED"
+        boolean is_active "Operational Flag"
+        timestamptz created_at "Registration Timestamp"
+        timestamptz updated_at "Last Modified Timestamp"
+    }
+
+    USER {
+        uuid id PK "Primary Key"
+        uuid institution_id FK "Employer Facility (Nullable for Admin)"
+        varchar name "Full Staff Name"
+        varchar email UK "Corporate Login Email"
+        varchar password_hash "Argon2 / BCrypt Hash"
+        enum role "PLATFORM_ADMIN | HOSPITAL_STAFF | BLOOD_BANK_STAFF"
+        boolean is_active "Active Credential Flag"
+        timestamptz created_at "Account Creation Timestamp"
+        timestamptz updated_at "Profile Update Timestamp"
+    }
+
+    SYSTEM_SETTING {
+        uuid id PK "Primary Key"
+        varchar key UK "Configuration Key Identifier"
+        text value "Config Value Payload"
+        text description "Operational Scope Documentation"
+        timestamptz updated_at "Last Update Timestamp"
+    }
+
+    %% -------------------------------------------------------------------------
+    %% 2. INVENTORY MANAGEMENT MODULE (RED)
+    %% -------------------------------------------------------------------------
+    BLOOD_UNIT {
+        uuid id PK "Primary Key"
+        uuid institution_id FK "Current Custodian Facility"
+        varchar unit_code UK "ISBT-128 Unique DIN Barcode"
+        enum component_type "RED_BLOOD_CELLS | PLATELETS | PLASMA"
+        enum abo_group "A | B | AB | O"
+        enum rh_factor "POSITIVE | NEGATIVE"
+        timestamptz collection_date "Phlebotomy Collection Date"
+        timestamptz expiry_date "Strict Expiration Boundary"
+        integer volume_ml "Net Volume in Milliliters"
+        enum testing_status "PENDING | PASSED | FAILED"
+        enum release_status "QUARANTINED | RELEASED | REJECTED"
+        enum inventory_status "AVAILABLE | RESERVED | IN_TRANSFER | TRANSFERRED | USED | EXPIRED | DISCARDED"
+        timestamptz created_at "Inventory Intake Timestamp"
+        timestamptz updated_at "State Mutation Timestamp"
+    }
+
+    INVENTORY_EVENT {
+        uuid id PK "Primary Key"
+        uuid blood_unit_id FK "Referenced Container"
+        enum event_type "REGISTRATION | STATUS_CHANGE | DISPATCH | RECEIPT | DISPOSAL"
+        enum previous_status "Prior Inventory Status"
+        enum new_status "Transition Target Status"
+        uuid actor_id FK "Executing User (Null if Automated Job)"
+        text notes "Audit Trail Notes"
+        timestamptz timestamp "Chain of Custody Timestamp"
+    }
+
+    %% -------------------------------------------------------------------------
+    %% 3. REQUEST & ALLOCATION MODULE (GREEN)
+    %% -------------------------------------------------------------------------
+    BLOOD_REQUEST {
+        uuid id PK "Primary Key"
+        uuid hospital_id FK "Requesting Hospital Facility"
+        uuid created_by_id FK "Requesting Physician / Staff"
+        enum requested_component "RED_BLOOD_CELLS | PLATELETS | PLASMA"
+        enum requested_abo "A | B | AB | O"
+        enum requested_rh "POSITIVE | NEGATIVE"
+        integer requested_quantity "Required Unit Packs (>0)"
+        enum urgency "ROUTINE | URGENT | EMERGENCY"
+        enum status "PENDING | VALIDATED | PARTIALLY_ALLOCATED | ALLOCATED | TRANSFER_PENDING | FULFILLED | CANCELLED"
+        timestamptz required_by "Clinical Deadline Timestamp"
+        text reason "Transfusion Case Notes"
+        boolean is_synthetic "Synthetic Workload Marker"
+        timestamptz created_at "Requisition Timestamp"
+        timestamptz updated_at "Workflow Timestamp"
+    }
+
+    ALLOCATION {
+        uuid id PK "Primary Key"
+        uuid request_id FK "Requisition Order"
+        uuid blood_unit_id FK "Assigned Physical Container"
+        uuid allocated_by_id FK "Authorizing Staff User"
+        enum status "RESERVED | FULFILLED | CANCELLED"
+        timestamptz created_at "Reservation Timestamp"
+        timestamptz updated_at "State Mutation Timestamp"
+    }
+
+    %% -------------------------------------------------------------------------
+    %% 4. LOGISTICS & TRANSFER MODULE (ORANGE)
+    %% -------------------------------------------------------------------------
+    TRANSFER {
+        uuid id PK "Primary Key"
+        uuid source_institution_id FK "Dispatching Facility"
+        uuid destination_institution_id FK "Receiving Facility"
+        uuid request_id FK "Associated Clinical Requisition"
+        enum status "REQUESTED | APPROVED | REJECTED | RESERVED | DISPATCHED | RECEIVED | CANCELLED | FAILED"
+        uuid approved_by_id FK "Authorizing Blood Bank Staff"
+        timestamptz dispatched_at "Carrier Departure Timestamp"
+        timestamptz received_at "Intake Delivery Timestamp"
+        text notes "Cold-Chain Logistics Notes"
+        timestamptz created_at "Manifest Creation Timestamp"
+        timestamptz updated_at "Manifest Mutation Timestamp"
+    }
+
+    TRANSFER_UNIT {
+        uuid id PK "Primary Key"
+        uuid transfer_id FK "Parent Transfer Manifest"
+        uuid blood_unit_id FK "Physical Unit Being Transported"
+        timestamptz created_at "Intake Into Manifest Timestamp"
+    }
+
+    %% -------------------------------------------------------------------------
+    %% 5. MONITORING, FORECASTING & AUDIT MODULE (PURPLE)
+    %% -------------------------------------------------------------------------
+    EXPIRY_ALERT {
+        uuid id PK "Primary Key"
+        uuid blood_unit_id FK "At-Risk Physical Container"
+        uuid institution_id FK "Facility In Possession"
+        enum severity "LOW | MEDIUM | HIGH | CRITICAL"
+        boolean resolved "Action Taken Flag"
+        timestamptz resolved_at "Resolution Timestamp"
+        timestamptz created_at "Alert Detection Timestamp"
+        timestamptz updated_at "Status Change Timestamp"
+    }
+
+    NOTIFICATION {
+        uuid id PK "Primary Key"
+        uuid recipient_user_id FK "Target Recipient User"
+        uuid institution_id FK "Scoping Facility Context"
+        varchar type "ALERT | DISPATCH | EMERGENCY | SYSTEM"
+        varchar title "Notification Heading"
+        text message "Operational Content Body"
+        jsonb metadata "Structured Context Identifiers"
+        timestamptz read_at "Acknowledgment Timestamp"
+        timestamptz created_at "Emission Timestamp"
+    }
+
+    DEMAND_FORECAST {
+        uuid id PK "Primary Key"
+        uuid institution_id FK "Target Facility"
+        enum component_type "RED_BLOOD_CELLS | PLATELETS | PLASMA"
+        enum abo_group "Target Blood Group"
+        enum rh_factor "Target Rh Antigen"
+        timestamptz forecast_date "Future Projection Day (UTC)"
+        integer horizon_days "Lead Time Window (7, 14, 30 Days)"
+        float predicted_demand "Estimated Component Packs"
+        float lower_bound "95% Confidence Lower Bound"
+        float upper_bound "95% Confidence Upper Bound"
+        varchar model_version "Algorithm (v1.0-ewma | seasonal-naive)"
+        jsonb metrics "Backtest Residuals (MAE, WAPE)"
+        timestamptz generated_at "Model Run Execution Timestamp"
+    }
+
+    AUDIT_LOG {
+        uuid id PK "Primary Key"
+        uuid actor_id FK "Executing Staff User (Null for System)"
+        uuid institution_id FK "Scoping Facility Context"
+        varchar entity_type "Polymorphic Target Entity Name"
+        varchar entity_id "Polymorphic Target Primary Key"
+        enum action "CREATE | UPDATE | DELETE | ALLOCATE | TRANSFER_*"
+        jsonb metadata "Immutable State Delta Snapshot"
+        timestamptz created_at "Audit Record Timestamp"
+    }
+
+    ANOMALY_EVENT {
+        uuid id PK "Primary Key"
+        uuid institution_id FK "Facility Experiencing Outlier"
+        enum component_type "Blood Component Type"
+        timestamptz date "Anomaly Occurrence Date"
+        float observed_value "Actual Observed Usage"
+        float expected_min "Lower Normal Operational Bound"
+        float expected_max "Upper Normal Operational Bound"
+        varchar anomaly_type "SPIKE | SHORTAGE | SURPLUS"
+        enum status "OPEN | ACKNOWLEDGED | DISMISSED | RESOLVED"
+        text reason "Clinical Outlier Cause Description"
+        varchar model_version "Detector Engine Version"
+        uuid reviewed_by_id FK "Reviewing Medical Officer"
+        text review_notes "Investigative Findings"
+        timestamptz reviewed_at "Review Completion Timestamp"
+        timestamptz created_at "Anomaly Trigger Timestamp"
+        timestamptz updated_at "Status Mutation Timestamp"
+    }
+
+    %% =========================================================================
+    %% 6. RELATIONSHIP DEFINITIONS & CROW'S FOOT CARDINALITIES
+    %% =========================================================================
+
+    %% Rel 1: Facility employs Staff (1:0..N)
+    INSTITUTION ||--o{ USER : "employs (institution_id)"
+
+    %% Rel 2: Facility stores Blood Units (1:0..N)
+    INSTITUTION ||--o{ BLOOD_UNIT : "stocks (institution_id)"
+
+    %% Rel 3: Facility submits Blood Requests (1:0..N)
+    INSTITUTION ||--o{ BLOOD_REQUEST : "submits (hospital_id)"
+
+    %% Rel 4: Staff User authors Blood Request (1:0..N)
+    USER ||--o{ BLOOD_REQUEST : "creates (created_by_id)"
+
+    %% Rel 5: Blood Request is fulfilled by Allocations (1:0..N)
+    BLOOD_REQUEST ||--o{ ALLOCATION : "allocated_for (request_id)"
+
+    %% Rel 6: Blood Unit is bound to Allocations (1:0..N)
+    BLOOD_UNIT ||--o{ ALLOCATION : "allocated_in (blood_unit_id)"
+
+    %% Rel 7: Staff User authorizes Allocation (1:0..N)
+    USER ||--o{ ALLOCATION : "authorizes (allocated_by_id)"
+
+    %% Rel 8: Facility acts as Source in Transfers (1:0..N)
+    INSTITUTION ||--o{ TRANSFER : "dispatches_from (source_institution_id)"
+
+    %% Rel 9: Facility acts as Destination in Transfers (1:0..N)
+    INSTITUTION ||--o{ TRANSFER : "receives_at (destination_institution_id)"
+
+    %% Rel 10: Blood Request triggers Transfer (0..1:0..N)
+    BLOOD_REQUEST |o--o{ TRANSFER : "fulfills_via (request_id)"
+
+    %% Rel 11: Staff User approves Transfer (0..1:0..N)
+    USER |o--o{ TRANSFER : "approves (approved_by_id)"
+
+    %% Rel 12: Transfer contains Shipment Units (1:1..N)
+    TRANSFER ||--|{ TRANSFER_UNIT : "manifest_item (transfer_id)"
+
+    %% Rel 13: Blood Unit is transported in Transfer Unit (1:0..N)
+    BLOOD_UNIT ||--o{ TRANSFER_UNIT : "manifested_unit (blood_unit_id)"
+
+    %% Rel 14: Blood Unit records History in Inventory Events (1:1..N)
+    BLOOD_UNIT ||--|{ INVENTORY_EVENT : "logs_history (blood_unit_id)"
+
+    %% Rel 15: Staff User triggers Inventory Event (0..1:0..N)
+    USER |o--o{ INVENTORY_EVENT : "triggered_by (actor_id)"
+
+    %% Rel 16: Blood Unit triggers Expiry Alerts (1:0..N)
+    BLOOD_UNIT ||--o{ EXPIRY_ALERT : "warns_for (blood_unit_id)"
+
+    %% Rel 17: Facility receives Expiry Alerts (1:0..N)
+    INSTITUTION ||--o{ EXPIRY_ALERT : "notifies_facility (institution_id)"
+
+    %% Rel 18: Staff User receives Notifications (1:0..N)
+    USER ||--o{ NOTIFICATION : "receives (recipient_user_id)"
+
+    %% Rel 19: Facility receives Demand Forecasts (1:0..N)
+    INSTITUTION ||--o{ DEMAND_FORECAST : "forecasts_for (institution_id)"
+
+    %% Rel 20: Staff User triggers Audit Logs (0..1:0..N)
+    USER |o--o{ AUDIT_LOG : "records_actor (actor_id)"
+
+    %% Rel 21: Facility scopes Audit Logs (0..1:0..N)
+    INSTITUTION |o--o{ AUDIT_LOG : "scopes_facility (institution_id)"
+
+    %% Rel 22: Facility records Anomaly Events (1:0..N)
+    INSTITUTION ||--o{ ANOMALY_EVENT : "reports_anomaly (institution_id)"
+
+    %% Rel 23: Staff User reviews Anomaly Events (0..1:0..N)
+    USER |o--o{ ANOMALY_EVENT : "reviewed_by (reviewed_by_id)"

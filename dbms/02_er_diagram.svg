@@ -1,0 +1,1380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>HemoSync ER Architecture with Explicit Cardinalities</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 2160px;
+    height: 1600px;
+    background: #090d16;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: #e2e8f0;
+    position: relative;
+    overflow: hidden;
+  }
+  .header-bar {
+    position: absolute;
+    top: 24px;
+    left: 80px;
+    right: 80px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 18px;
+    border-bottom: 2px solid #1e293b;
+  }
+  .title-group h1 {
+    font-size: 28px;
+    font-weight: 800;
+    color: #f8fafc;
+    letter-spacing: -0.5px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .title-group p {
+    font-size: 14px;
+    color: #94a3b8;
+    margin-top: 5px;
+    font-weight: 500;
+  }
+  .legend-box {
+    display: flex;
+    gap: 18px;
+    align-items: center;
+    background: #111827;
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: 1px solid #1f2937;
+    font-size: 13px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .module-tag {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+  }
+  .badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1.2;
+    letter-spacing: 0.5px;
+  }
+  .badge.pk { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+  .badge.fk { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+  .badge.uk { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+  
+  .card-pill {
+    position: absolute;
+    padding: 2px 7px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    pointer-events: none;
+    z-index: 3;
+    white-space: nowrap;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+  }
+  .parent-pill {
+    background: #1e3a8a;
+    color: #bfdbfe;
+    border: 1px solid #3b82f6;
+  }
+  .child-pill {
+    background: #065f46;
+    color: #a7f3d0;
+    border: 1px solid #10b981;
+  }
+  .mid-pill {
+    background: #1f2937;
+    color: #f1f5f9;
+    border: 1px solid #475569;
+    font-size: 10px;
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    opacity: 0.95;
+  }
+
+  .table-card {
+    position: absolute;
+    background: #111827;
+    border-radius: 8px;
+    box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.7);
+    border: 1px solid #1e293b;
+    overflow: hidden;
+    z-index: 2;
+  }
+  .table-header {
+    padding: 9px 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .table-title {
+    font-weight: 700;
+    font-size: 14px;
+    color: #ffffff;
+    letter-spacing: 0.4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+  .table-cat {
+    font-size: 10px;
+    color: rgba(255,255,255,0.8);
+    font-weight: 700;
+    letter-spacing: 0.8px;
+  }
+  .table-body {
+    padding: 0;
+  }
+  .col-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 14px;
+    font-size: 11.5px;
+    border-bottom: 1px solid #1f2937;
+  }
+  .col-name {
+    color: #f1f5f9;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .col-type {
+    color: #94a3b8;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 10.5px;
+  }
+  svg.connectors {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 2160px;
+    height: 1600px;
+    z-index: 1;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<div class="header-bar">
+  <div class="title-group">
+    <h1>🩸 HemoSync — Entity-Relationship Architecture with Explicit Cardinalities</h1>
+    <p>PostgreSQL 16+ Production Schema (BCNF • ISBT-128 • Explicit 1:N, 1:1, M:N Crow's Foot Cardinalities & Optionality)</p>
+  </div>
+  <div class="legend-box">
+    <div class="legend-item"><span class="badge pk">PK</span> Primary Key</div>
+    <div class="legend-item"><span class="badge fk">FK</span> Foreign Key</div>
+    <div class="legend-item"><span class="badge uk">UK</span> Unique Key</div>
+    <div class="legend-item"><span class="card-pill parent-pill" style="position:static;">1 (1..1)</span> Parent (One)</div>
+    <div class="legend-item"><span class="card-pill child-pill" style="position:static;">N (0..N)</span> Child (Many)</div>
+  </div>
+</div>
+
+<svg class="connectors">
+  
+    <g class="rel-group">
+      <path d="M 212 530 C 212 530, 212 690, 212 690" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-dasharray="4,3" />
+      
+    <line x1="208" y1="523" x2="208" y2="537" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="203" y1="523" x2="203" y2="537" stroke="#f8fafc" stroke-width="2.5" />
+  
+      
+    <line x1="212" y1="690" x2="198" y2="682" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="212" y1="690" x2="198" y2="698" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="212" y1="690" x2="198" y2="690" stroke="#f8fafc" stroke-width="2.5" />
+    <circle cx="192" cy="690" r="4" fill="#090d16" stroke="#f8fafc" stroke-width="2" />
+  
+    </g>
+  
+    <g class="rel-group">
+      <path d="M 460 295.5 C 537 295.5, 523 304.25, 600 304.25" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-dasharray="4,3" />
+      
+    <line x1="456" y1="288.5" x2="456" y2="302.5" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="451" y1="288.5" x2="451" y2="302.5" stroke="#f8fafc" stroke-width="2.5" />
+  
+      
+    <line x1="600" y1="304.25" x2="586" y2="296.25" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="600" y1="304.25" x2="586" y2="312.25" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="600" y1="304.25" x2="586" y2="304.25" stroke="#f8fafc" stroke-width="2.5" />
+    <circle cx="580" cy="304.25" r="4" fill="#090d16" stroke="#f8fafc" stroke-width="2" />
+  
+    </g>
+  
+    <g class="rel-group">
+      <path d="M 460 308.5 C 537 308.5, 523 818.5, 600 818.5" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-dasharray="4,3" />
+      
+    <line x1="456" y1="301.5" x2="456" y2="315.5" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="451" y1="301.5" x2="451" y2="315.5" stroke="#f8fafc" stroke-width="2.5" />
+  
+      
+    <line x1="600" y1="818.5" x2="586" y2="810.5" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="600" y1="818.5" x2="586" y2="826.5" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="600" y1="818.5" x2="586" y2="818.5" stroke="#f8fafc" stroke-width="2.5" />
+    <circle cx="580" cy="818.5" r="4" fill="#090d16" stroke="#f8fafc" stroke-width="2" />
+  
+    </g>
+  
+    <g class="rel-group">
+      <path d="M 460 796.5 C 537 796.5, 523 831.5, 600 831.5" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-dasharray="4,3" />
+      
+    <line x1="456" y1="789.5" x2="456" y2="803.5" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="451" y1="789.5" x2="451" y2="803.5" stroke="#f8fafc" stroke-width="2.5" />
+  
+      
+    <line x1="600" y1="831.5" x2="586" y2="823.5" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="600" y1="831.5" x2="586" y2="839.5" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="600" y1="831.5" x2="586" y2="831.5" stroke="#f8fafc" stroke-width="2.5" />
+    <circle cx="580" cy="831.5" r="4" fill="#090d16" stroke="#f8fafc" stroke-width="2" />
+  
+    </g>
+  
+    <g class="rel-group">
+      <path d="M 752 1040 C 752 1040, 752 1170, 752 1170" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-dasharray="4,3" />
+      
+    <line x1="748" y1="1033" x2="748" y2="1047" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="743" y1="1033" x2="743" y2="1047" stroke="#f8fafc" stroke-width="2.5" />
+  
+      
+    <line x1="752" y1="1170" x2="738" y2="1162" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="752" y1="1170" x2="738" y2="1178" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="752" y1="1170" x2="738" y2="1170" stroke="#f8fafc" stroke-width="2.5" />
+    <circle cx="732" cy="1170" r="4" fill="#090d16" stroke="#f8fafc" stroke-width="2" />
+  
+    </g>
+  
+    <g class="rel-group">
+      <path d="M 765 555 C 765 555, 765 1170, 765 1170" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-dasharray="4,3" />
+      
+    <line x1="761" y1="548" x2="761" y2="562" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="756" y1="548" x2="756" y2="562" stroke="#f8fafc" stroke-width="2.5" />
+  
+      
+      <circle cx="749" cy="1170" r="4" fill="#090d16" stroke="#f8fafc" stroke-width="2" />
+      <line x1="758" y1="1162" x2="758" y2="1178" stroke="#f8fafc" stroke-width="2.5" />
+    
+    </g>
+  
+    <g class="rel-group">
+      <path d="M 460 795.5 C 537 795.5, 523 1258, 600 1258" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-dasharray="4,3" />
+      
+    <line x1="456" y1="788.5" x2="456" y2="802.5" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="451" y1="788.5" x2="451" y2="802.5" stroke="#f8fafc" stroke-width="2.5" />
+  
+      
+    <line x1="600" y1="1258" x2="586" y2="1250" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="600" y1="1258" x2="586" y2="1266" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="600" y1="1258" x2="586" y2="1258" stroke="#f8fafc" stroke-width="2.5" />
+    <circle cx="580" cy="1258" r="4" fill="#090d16" stroke="#f8fafc" stroke-width="2" />
+  
+    </g>
+  
+    <g class="rel-group">
+      <path d="M 223 180 C 812.6 180, 705.4 180, 1295 180" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-dasharray="4,3" />
+      
+    <line x1="219" y1="173" x2="219" y2="187" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="214" y1="173" x2="214" y2="187" stroke="#f8fafc" stroke-width="2.5" />
+  
+      
+    <line x1="1295" y1="180" x2="1281" y2="172" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="1295" y1="180" x2="1281" y2="188" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="1295" y1="180" x2="1281" y2="180" stroke="#f8fafc" stroke-width="2.5" />
+    <circle cx="1275" cy="180" r="4" fill="#090d16" stroke="#f8fafc" stroke-width="2" />
+  
+    </g>
+  
+    <g class="rel-group">
+      <path d="M 236 180 C 825.6 180, 718.4 180, 1308 180" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-dasharray="4,3" />
+      
+    <line x1="232" y1="173" x2="232" y2="187" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="227" y1="173" x2="227" y2="187" stroke="#f8fafc" stroke-width="2.5" />
+  
+      
+    <line x1="1308" y1="180" x2="1294" y2="172" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="1308" y1="180" x2="1294" y2="188" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="1308" y1="180" x2="1294" y2="180" stroke="#f8fafc" stroke-width="2.5" />
+    <circle cx="1288" cy="180" r="4" fill="#090d16" stroke="#f8fafc" stroke-width="2" />
+  
+    </g>
+  
+    <g class="rel-group">
+      <path d="M 1000 829.5 C 1077 829.5, 1063 302, 1140 302" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-dasharray="4,3" />
+      
+      <circle cx="988" cy="829.5" r="4" fill="#090d16" stroke="#f8fafc" stroke-width="2" />
+      <line x1="995" y1="822.5" x2="995" y2="836.5" stroke="#f8fafc" stroke-width="2.5" />
+    
+      
+    <line x1="1140" y1="302" x2="1126" y2="294" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="1140" y1="302" x2="1126" y2="310" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="1140" y1="302" x2="1126" y2="302" stroke="#f8fafc" stroke-width="2.5" />
+    <circle cx="1120" cy="302" r="4" fill="#090d16" stroke="#f8fafc" stroke-width="2" />
+  
+    </g>
+  
+    <g class="rel-group">
+      <path d="M 460 767.5 C 834 767.5, 766 275, 1140 275" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-dasharray="4,3" />
+      
+      <circle cx="448" cy="767.5" r="4" fill="#090d16" stroke="#f8fafc" stroke-width="2" />
+      <line x1="455" y1="760.5" x2="455" y2="774.5" stroke="#f8fafc" stroke-width="2.5" />
+    
+      
+    <line x1="1140" y1="275" x2="1126" y2="267" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="1140" y1="275" x2="1126" y2="283" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="1140" y1="275" x2="1126" y2="275" stroke="#f8fafc" stroke-width="2.5" />
+    <circle cx="1120" cy="275" r="4" fill="#090d16" stroke="#f8fafc" stroke-width="2" />
+  
+    </g>
+  
+    <g class="rel-group">
+      <path d="M 1307 480 C 1307 480, 1307 600, 1307 600" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-dasharray="4,3" />
+      
+    <line x1="1303" y1="473" x2="1303" y2="487" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="1298" y1="473" x2="1298" y2="487" stroke="#f8fafc" stroke-width="2.5" />
+  
+      
+      <line x1="1307" y1="600" x2="1293" y2="592" stroke="#f8fafc" stroke-width="2.5" />
+      <line x1="1307" y1="600" x2="1293" y2="608" stroke="#f8fafc" stroke-width="2.5" />
+      <line x1="1307" y1="600" x2="1293" y2="600" stroke="#f8fafc" stroke-width="2.5" />
+      <line x1="1289" y1="592" x2="1289" y2="608" stroke="#f8fafc" stroke-width="2.5" />
+    
+    </g>
+  
+    <g class="rel-group">
+      <path d="M 1000 327.25 C 1077 327.25, 1063 668.5, 1140 668.5" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-dasharray="4,3" />
+      
+    <line x1="996" y1="320.25" x2="996" y2="334.25" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="991" y1="320.25" x2="991" y2="334.25" stroke="#f8fafc" stroke-width="2.5" />
+  
+      
+    <line x1="1140" y1="668.5" x2="1126" y2="660.5" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="1140" y1="668.5" x2="1126" y2="676.5" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="1140" y1="668.5" x2="1126" y2="668.5" stroke="#f8fafc" stroke-width="2.5" />
+    <circle cx="1120" cy="668.5" r="4" fill="#090d16" stroke="#f8fafc" stroke-width="2" />
+  
+    </g>
+  
+    <g class="rel-group">
+      <path d="M 1000 300.25 C 1077 300.25, 1063 916.5, 1140 916.5" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-dasharray="4,3" />
+      
+    <line x1="996" y1="293.25" x2="996" y2="307.25" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="991" y1="293.25" x2="991" y2="307.25" stroke="#f8fafc" stroke-width="2.5" />
+  
+      
+      <line x1="1140" y1="916.5" x2="1126" y2="908.5" stroke="#f8fafc" stroke-width="2.5" />
+      <line x1="1140" y1="916.5" x2="1126" y2="924.5" stroke="#f8fafc" stroke-width="2.5" />
+      <line x1="1140" y1="916.5" x2="1126" y2="916.5" stroke="#f8fafc" stroke-width="2.5" />
+      <line x1="1122" y1="908.5" x2="1122" y2="924.5" stroke="#f8fafc" stroke-width="2.5" />
+    
+    </g>
+  
+    <g class="rel-group">
+      <path d="M 460 779.5 C 834 779.5, 766 929.5, 1140 929.5" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-dasharray="4,3" />
+      
+      <circle cx="448" cy="779.5" r="4" fill="#090d16" stroke="#f8fafc" stroke-width="2" />
+      <line x1="455" y1="772.5" x2="455" y2="786.5" stroke="#f8fafc" stroke-width="2.5" />
+    
+      
+    <line x1="1140" y1="929.5" x2="1126" y2="921.5" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="1140" y1="929.5" x2="1126" y2="937.5" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="1140" y1="929.5" x2="1126" y2="929.5" stroke="#f8fafc" stroke-width="2.5" />
+    <circle cx="1120" cy="929.5" r="4" fill="#090d16" stroke="#f8fafc" stroke-width="2" />
+  
+    </g>
+  
+    <g class="rel-group">
+      <path d="M 775 180 C 1372.3000000000002 180, 1263.6999999999998 180, 1861 180" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-dasharray="4,3" />
+      
+    <line x1="771" y1="173" x2="771" y2="187" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="766" y1="173" x2="766" y2="187" stroke="#f8fafc" stroke-width="2.5" />
+  
+      
+    <line x1="1861" y1="180" x2="1847" y2="172" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="1861" y1="180" x2="1847" y2="188" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="1861" y1="180" x2="1847" y2="180" stroke="#f8fafc" stroke-width="2.5" />
+    <circle cx="1841" cy="180" r="4" fill="#090d16" stroke="#f8fafc" stroke-width="2" />
+  
+    </g>
+  
+    <g class="rel-group">
+      <path d="M 220 180 C 1107.7 180, 946.3 180, 1834 180" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-dasharray="4,3" />
+      
+    <line x1="216" y1="173" x2="216" y2="187" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="211" y1="173" x2="211" y2="187" stroke="#f8fafc" stroke-width="2.5" />
+  
+      
+    <line x1="1834" y1="180" x2="1820" y2="172" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="1834" y1="180" x2="1820" y2="188" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="1834" y1="180" x2="1820" y2="180" stroke="#f8fafc" stroke-width="2.5" />
+    <circle cx="1814" cy="180" r="4" fill="#090d16" stroke="#f8fafc" stroke-width="2" />
+  
+    </g>
+  
+    <g class="rel-group">
+      <path d="M 233 940 C 1120.7 940, 959.3 1120, 1847 1120" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-dasharray="4,3" />
+      
+    <line x1="229" y1="933" x2="229" y2="947" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="224" y1="933" x2="224" y2="947" stroke="#f8fafc" stroke-width="2.5" />
+  
+      
+    <line x1="1847" y1="1120" x2="1833" y2="1112" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="1847" y1="1120" x2="1833" y2="1128" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="1847" y1="1120" x2="1833" y2="1120" stroke="#f8fafc" stroke-width="2.5" />
+    <circle cx="1827" cy="1120" r="4" fill="#090d16" stroke="#f8fafc" stroke-width="2" />
+  
+    </g>
+  
+    <g class="rel-group">
+      <path d="M 246 530 C 1133.7 530, 972.3 840, 1860 840" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-dasharray="4,3" />
+      
+    <line x1="242" y1="523" x2="242" y2="537" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="237" y1="523" x2="237" y2="537" stroke="#f8fafc" stroke-width="2.5" />
+  
+      
+    <line x1="1860" y1="840" x2="1846" y2="832" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="1860" y1="840" x2="1846" y2="848" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="1860" y1="840" x2="1846" y2="840" stroke="#f8fafc" stroke-width="2.5" />
+    <circle cx="1840" cy="840" r="4" fill="#090d16" stroke="#f8fafc" stroke-width="2" />
+  
+    </g>
+  
+    <g class="rel-group">
+      <path d="M 219 940 C 1106.7 940, 945.3 1440, 1833 1440" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-dasharray="4,3" />
+      
+      <circle cx="207" cy="940" r="4" fill="#090d16" stroke="#f8fafc" stroke-width="2" />
+      <line x1="214" y1="933" x2="214" y2="947" stroke="#f8fafc" stroke-width="2.5" />
+    
+      
+    <line x1="1833" y1="1440" x2="1819" y2="1432" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="1833" y1="1440" x2="1819" y2="1448" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="1833" y1="1440" x2="1819" y2="1440" stroke="#f8fafc" stroke-width="2.5" />
+    <circle cx="1813" cy="1440" r="4" fill="#090d16" stroke="#f8fafc" stroke-width="2" />
+  
+    </g>
+  
+    <g class="rel-group">
+      <path d="M 232 530 C 1119.7 530, 958.3 1440, 1846 1440" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-dasharray="4,3" />
+      
+      <circle cx="220" cy="530" r="4" fill="#090d16" stroke="#f8fafc" stroke-width="2" />
+      <line x1="227" y1="523" x2="227" y2="537" stroke="#f8fafc" stroke-width="2.5" />
+    
+      
+    <line x1="1846" y1="1440" x2="1832" y2="1432" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="1846" y1="1440" x2="1832" y2="1448" stroke="#f8fafc" stroke-width="2.5" />
+    <line x1="1846" y1="1440" x2="1832" y2="1440" stroke="#f8fafc" stroke-width="2.5" />
+    <circle cx="1826" cy="1440" r="4" fill="#090d16" stroke="#f8fafc" stroke-width="2" />
+  
+    </g>
+  
+</svg>
+
+
+    <div class="table-card" style="left:80px; top:180px; width:380px; border-top: 4px solid #3b82f6;">
+      <div class="table-header" style="background:#1e3a8a;">
+        <span class="table-title">institutions</span>
+        <span class="table-cat">FACILITY</span>
+      </div>
+      <div class="table-body">
+        
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">id <span class="badge pk">PK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">name </span>
+        <span class="col-type">VARCHAR(255)</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">type </span>
+        <span class="col-type">InstitutionType</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">address </span>
+        <span class="col-type">TEXT</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">latitude </span>
+        <span class="col-type">FLOAT</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">longitude </span>
+        <span class="col-type">FLOAT</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">license_number <span class="badge uk">UK</span></span>
+        <span class="col-type">VARCHAR(100)</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">phone </span>
+        <span class="col-type">VARCHAR(50)</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">email </span>
+        <span class="col-type">VARCHAR(255)</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">verification_status </span>
+        <span class="col-type">VerificationStatus</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">is_active </span>
+        <span class="col-type">BOOLEAN</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">created_at </span>
+        <span class="col-type">TIMESTAMPTZ</span>
+      </div>
+    
+      </div>
+    </div>
+  
+    <div class="table-card" style="left:80px; top:690px; width:380px; border-top: 4px solid #3b82f6;">
+      <div class="table-header" style="background:#1e3a8a;">
+        <span class="table-title">users</span>
+        <span class="table-cat">FACILITY</span>
+      </div>
+      <div class="table-body">
+        
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">id <span class="badge pk">PK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">institution_id <span class="badge fk">FK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">name </span>
+        <span class="col-type">VARCHAR(255)</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">email <span class="badge uk">UK</span></span>
+        <span class="col-type">VARCHAR(255)</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">password_hash </span>
+        <span class="col-type">VARCHAR(255)</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">role </span>
+        <span class="col-type">UserRole</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">is_active </span>
+        <span class="col-type">BOOLEAN</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">created_at </span>
+        <span class="col-type">TIMESTAMPTZ</span>
+      </div>
+    
+      </div>
+    </div>
+  
+    <div class="table-card" style="left:80px; top:1080px; width:380px; border-top: 4px solid #3b82f6;">
+      <div class="table-header" style="background:#1e3a8a;">
+        <span class="table-title">system_settings</span>
+        <span class="table-cat">FACILITY</span>
+      </div>
+      <div class="table-body">
+        
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">id <span class="badge pk">PK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">key <span class="badge uk">UK</span></span>
+        <span class="col-type">VARCHAR(100)</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">value </span>
+        <span class="col-type">TEXT</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">description </span>
+        <span class="col-type">TEXT</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">updated_at </span>
+        <span class="col-type">TIMESTAMPTZ</span>
+      </div>
+    
+      </div>
+    </div>
+  
+    <div class="table-card" style="left:600px; top:180px; width:400px; border-top: 4px solid #e11d48;">
+      <div class="table-header" style="background:#881337;">
+        <span class="table-title">blood_units</span>
+        <span class="table-cat">INVENTORY</span>
+      </div>
+      <div class="table-body">
+        
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">id <span class="badge pk">PK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">institution_id <span class="badge fk">FK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">unit_code <span class="badge uk">UK</span></span>
+        <span class="col-type">VARCHAR(50)</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">component_type </span>
+        <span class="col-type">BloodComponentType</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">abo_group </span>
+        <span class="col-type">AboGroup</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">rh_factor </span>
+        <span class="col-type">RhFactor</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">collection_date </span>
+        <span class="col-type">TIMESTAMPTZ</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">expiry_date </span>
+        <span class="col-type">TIMESTAMPTZ</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">volume_ml </span>
+        <span class="col-type">INTEGER</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">testing_status </span>
+        <span class="col-type">TestingStatus</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">release_status </span>
+        <span class="col-type">ReleaseStatus</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">inventory_status </span>
+        <span class="col-type">InventoryStatus</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">created_at </span>
+        <span class="col-type">TIMESTAMPTZ</span>
+      </div>
+    
+      </div>
+    </div>
+  
+    <div class="table-card" style="left:600px; top:690px; width:400px; border-top: 4px solid #10b981;">
+      <div class="table-header" style="background:#064e3b;">
+        <span class="table-title">blood_requests</span>
+        <span class="table-cat">REQUEST</span>
+      </div>
+      <div class="table-body">
+        
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">id <span class="badge pk">PK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">hospital_id <span class="badge fk">FK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">created_by_id <span class="badge fk">FK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">requested_component </span>
+        <span class="col-type">BloodComponentType</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">requested_abo </span>
+        <span class="col-type">AboGroup</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">requested_rh </span>
+        <span class="col-type">RhFactor</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">requested_quantity </span>
+        <span class="col-type">INTEGER</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">urgency </span>
+        <span class="col-type">RequestUrgency</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">status </span>
+        <span class="col-type">RequestStatus</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">required_by </span>
+        <span class="col-type">TIMESTAMPTZ</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">reason </span>
+        <span class="col-type">TEXT</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">created_at </span>
+        <span class="col-type">TIMESTAMPTZ</span>
+      </div>
+    
+      </div>
+    </div>
+  
+    <div class="table-card" style="left:600px; top:1170px; width:400px; border-top: 4px solid #10b981;">
+      <div class="table-header" style="background:#064e3b;">
+        <span class="table-title">allocations</span>
+        <span class="table-cat">REQUEST</span>
+      </div>
+      <div class="table-body">
+        
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">id <span class="badge pk">PK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">request_id <span class="badge fk">FK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">blood_unit_id <span class="badge fk">FK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">allocated_by_id <span class="badge fk">FK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">status </span>
+        <span class="col-type">AllocationStatus</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">created_at </span>
+        <span class="col-type">TIMESTAMPTZ</span>
+      </div>
+    
+      </div>
+    </div>
+  
+    <div class="table-card" style="left:1140px; top:180px; width:410px; border-top: 4px solid #f97316;">
+      <div class="table-header" style="background:#7c2d12;">
+        <span class="table-title">transfers</span>
+        <span class="table-cat">LOGISTICS</span>
+      </div>
+      <div class="table-body">
+        
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">id <span class="badge pk">PK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">source_institution_id <span class="badge fk">FK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">destination_institution_id <span class="badge fk">FK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">request_id <span class="badge fk">FK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">status </span>
+        <span class="col-type">TransferStatus</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">approved_by_id <span class="badge fk">FK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">dispatched_at </span>
+        <span class="col-type">TIMESTAMPTZ</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">received_at </span>
+        <span class="col-type">TIMESTAMPTZ</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">notes </span>
+        <span class="col-type">TEXT</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">created_at </span>
+        <span class="col-type">TIMESTAMPTZ</span>
+      </div>
+    
+      </div>
+    </div>
+  
+    <div class="table-card" style="left:1140px; top:600px; width:410px; border-top: 4px solid #f97316;">
+      <div class="table-header" style="background:#7c2d12;">
+        <span class="table-title">transfer_units</span>
+        <span class="table-cat">LOGISTICS</span>
+      </div>
+      <div class="table-body">
+        
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">id <span class="badge pk">PK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">transfer_id <span class="badge fk">FK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">blood_unit_id <span class="badge fk">FK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">created_at </span>
+        <span class="col-type">TIMESTAMPTZ</span>
+      </div>
+    
+      </div>
+    </div>
+  
+    <div class="table-card" style="left:1140px; top:840px; width:410px; border-top: 4px solid #e11d48;">
+      <div class="table-header" style="background:#881337;">
+        <span class="table-title">inventory_events</span>
+        <span class="table-cat">INVENTORY</span>
+      </div>
+      <div class="table-body">
+        
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">id <span class="badge pk">PK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">blood_unit_id <span class="badge fk">FK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">event_type </span>
+        <span class="col-type">EventType</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">previous_status </span>
+        <span class="col-type">InventoryStatus</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">new_status </span>
+        <span class="col-type">InventoryStatus</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">actor_id <span class="badge fk">FK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">notes </span>
+        <span class="col-type">TEXT</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">timestamp </span>
+        <span class="col-type">TIMESTAMPTZ</span>
+      </div>
+    
+      </div>
+    </div>
+  
+    <div class="table-card" style="left:1690px; top:180px; width:390px; border-top: 4px solid #8b5cf6;">
+      <div class="table-header" style="background:#4c1d95;">
+        <span class="table-title">expiry_alerts</span>
+        <span class="table-cat">MONITORING</span>
+      </div>
+      <div class="table-body">
+        
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">id <span class="badge pk">PK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">blood_unit_id <span class="badge fk">FK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">institution_id <span class="badge fk">FK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">severity </span>
+        <span class="col-type">AlertSeverity</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">resolved </span>
+        <span class="col-type">BOOLEAN</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">resolved_at </span>
+        <span class="col-type">TIMESTAMPTZ</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">created_at </span>
+        <span class="col-type">TIMESTAMPTZ</span>
+      </div>
+    
+      </div>
+    </div>
+  
+    <div class="table-card" style="left:1690px; top:490px; width:390px; border-top: 4px solid #8b5cf6;">
+      <div class="table-header" style="background:#4c1d95;">
+        <span class="table-title">demand_forecasts</span>
+        <span class="table-cat">MONITORING</span>
+      </div>
+      <div class="table-body">
+        
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">id <span class="badge pk">PK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">institution_id <span class="badge fk">FK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">component_type </span>
+        <span class="col-type">BloodComponentType</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">abo_group </span>
+        <span class="col-type">AboGroup</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">rh_factor </span>
+        <span class="col-type">RhFactor</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">forecast_date </span>
+        <span class="col-type">TIMESTAMPTZ</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">horizon_days </span>
+        <span class="col-type">INTEGER</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">predicted_demand </span>
+        <span class="col-type">FLOAT</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">lower_bound </span>
+        <span class="col-type">FLOAT</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">upper_bound </span>
+        <span class="col-type">FLOAT</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">model_version </span>
+        <span class="col-type">VARCHAR(50)</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">metrics </span>
+        <span class="col-type">JSONB</span>
+      </div>
+    
+      </div>
+    </div>
+  
+    <div class="table-card" style="left:1690px; top:920px; width:390px; border-top: 4px solid #8b5cf6;">
+      <div class="table-header" style="background:#4c1d95;">
+        <span class="table-title">notifications</span>
+        <span class="table-cat">MONITORING</span>
+      </div>
+      <div class="table-body">
+        
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">id <span class="badge pk">PK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">recipient_user_id <span class="badge fk">FK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">title </span>
+        <span class="col-type">VARCHAR(255)</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">message </span>
+        <span class="col-type">TEXT</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">read_at </span>
+        <span class="col-type">TIMESTAMPTZ</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">created_at </span>
+        <span class="col-type">TIMESTAMPTZ</span>
+      </div>
+    
+      </div>
+    </div>
+  
+    <div class="table-card" style="left:1690px; top:1190px; width:390px; border-top: 4px solid #8b5cf6;">
+      <div class="table-header" style="background:#4c1d95;">
+        <span class="table-title">audit_logs</span>
+        <span class="table-cat">MONITORING</span>
+      </div>
+      <div class="table-body">
+        
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">id <span class="badge pk">PK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">actor_id <span class="badge fk">FK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">institution_id <span class="badge fk">FK</span></span>
+        <span class="col-type">UUID</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">entity_type </span>
+        <span class="col-type">VARCHAR(100)</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">entity_id </span>
+        <span class="col-type">VARCHAR(100)</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">action </span>
+        <span class="col-type">AuditAction</span>
+      </div>
+    
+      <div class="col-row" style="background:#111827;">
+        <span class="col-name">metadata </span>
+        <span class="col-type">JSONB</span>
+      </div>
+    
+      <div class="col-row" style="background:#1e293b;">
+        <span class="col-name">created_at </span>
+        <span class="col-type">TIMESTAMPTZ</span>
+      </div>
+    
+      </div>
+    </div>
+  
+
+    <div class="card-pill parent-pill" style="left:167px; top:512px;">
+      1 (1..1)
+    </div>
+    <div class="card-pill child-pill" style="left:222px; top:672px;">
+      N (0..N)
+    </div>
+    <div class="card-pill mid-pill" style="left:167px; top:598px;">
+      employs
+    </div>
+  
+    <div class="card-pill parent-pill" style="left:470px; top:277.5px;">
+      1 (1..1)
+    </div>
+    <div class="card-pill child-pill" style="left:550px; top:286.25px;">
+      N (0..N)
+    </div>
+    <div class="card-pill mid-pill" style="left:485px; top:287.875px;">
+      stocks
+    </div>
+  
+    <div class="card-pill parent-pill" style="left:470px; top:290.5px;">
+      1 (1..1)
+    </div>
+    <div class="card-pill child-pill" style="left:550px; top:800.5px;">
+      N (0..N)
+    </div>
+    <div class="card-pill mid-pill" style="left:485px; top:551.5px;">
+      submits
+    </div>
+  
+    <div class="card-pill parent-pill" style="left:470px; top:778.5px;">
+      1 (1..1)
+    </div>
+    <div class="card-pill child-pill" style="left:550px; top:813.5px;">
+      N (0..N)
+    </div>
+    <div class="card-pill mid-pill" style="left:485px; top:802px;">
+      created_by
+    </div>
+  
+    <div class="card-pill parent-pill" style="left:707px; top:1022px;">
+      1 (1..1)
+    </div>
+    <div class="card-pill child-pill" style="left:762px; top:1152px;">
+      N (0..N)
+    </div>
+    <div class="card-pill mid-pill" style="left:707px; top:1093px;">
+      allocated_for
+    </div>
+  
+    <div class="card-pill parent-pill" style="left:720px; top:537px;">
+      1 (1..1)
+    </div>
+    <div class="card-pill child-pill" style="left:775px; top:1152px;">
+      0..1 (active)
+    </div>
+    <div class="card-pill mid-pill" style="left:720px; top:850.5px;">
+      reserved_in
+    </div>
+  
+    <div class="card-pill parent-pill" style="left:470px; top:777.5px;">
+      1 (1..1)
+    </div>
+    <div class="card-pill child-pill" style="left:550px; top:1240px;">
+      N (0..N)
+    </div>
+    <div class="card-pill mid-pill" style="left:485px; top:1014.75px;">
+      authorized_by
+    </div>
+  
+    <div class="card-pill parent-pill" style="left:233px; top:162px;">
+      1 (1..1)
+    </div>
+    <div class="card-pill child-pill" style="left:1245px; top:162px;">
+      N (0..N)
+    </div>
+    <div class="card-pill mid-pill" style="left:714px; top:168px;">
+      source_facility
+    </div>
+  
+    <div class="card-pill parent-pill" style="left:246px; top:162px;">
+      1 (1..1)
+    </div>
+    <div class="card-pill child-pill" style="left:1258px; top:162px;">
+      N (0..N)
+    </div>
+    <div class="card-pill mid-pill" style="left:727px; top:168px;">
+      dest_facility
+    </div>
+  
+    <div class="card-pill parent-pill" style="left:1010px; top:811.5px;">
+      0..1 (0..1)
+    </div>
+    <div class="card-pill child-pill" style="left:1090px; top:284px;">
+      N (0..N)
+    </div>
+    <div class="card-pill mid-pill" style="left:1025px; top:553.75px;">
+      fulfills_request
+    </div>
+  
+    <div class="card-pill parent-pill" style="left:470px; top:749.5px;">
+      0..1 (0..1)
+    </div>
+    <div class="card-pill child-pill" style="left:1090px; top:257px;">
+      N (0..N)
+    </div>
+    <div class="card-pill mid-pill" style="left:755px; top:509.25px;">
+      approved_by
+    </div>
+  
+    <div class="card-pill parent-pill" style="left:1262px; top:462px;">
+      1 (1..1)
+    </div>
+    <div class="card-pill child-pill" style="left:1317px; top:582px;">
+      1..N (items)
+    </div>
+    <div class="card-pill mid-pill" style="left:1262px; top:528px;">
+      manifest_items
+    </div>
+  
+    <div class="card-pill parent-pill" style="left:1010px; top:309.25px;">
+      1 (1..1)
+    </div>
+    <div class="card-pill child-pill" style="left:1090px; top:650.5px;">
+      N (0..N)
+    </div>
+    <div class="card-pill mid-pill" style="left:1025px; top:485.875px;">
+      manifested_in
+    </div>
+  
+    <div class="card-pill parent-pill" style="left:1010px; top:282.25px;">
+      1 (1..1)
+    </div>
+    <div class="card-pill child-pill" style="left:1090px; top:898.5px;">
+      1..N (events)
+    </div>
+    <div class="card-pill mid-pill" style="left:1025px; top:596.375px;">
+      lifecycle_history
+    </div>
+  
+    <div class="card-pill parent-pill" style="left:470px; top:761.5px;">
+      0..1 (0..1)
+    </div>
+    <div class="card-pill child-pill" style="left:1090px; top:911.5px;">
+      N (0..N)
+    </div>
+    <div class="card-pill mid-pill" style="left:755px; top:842.5px;">
+      actor_user
+    </div>
+  
+    <div class="card-pill parent-pill" style="left:785px; top:162px;">
+      1 (1..1)
+    </div>
+    <div class="card-pill child-pill" style="left:1811px; top:162px;">
+      N (0..N)
+    </div>
+    <div class="card-pill mid-pill" style="left:1273px; top:168px;">
+      triggers_alert
+    </div>
+  
+    <div class="card-pill parent-pill" style="left:230px; top:162px;">
+      1 (1..1)
+    </div>
+    <div class="card-pill child-pill" style="left:1784px; top:162px;">
+      N (0..N)
+    </div>
+    <div class="card-pill mid-pill" style="left:982px; top:168px;">
+      scoped_facility
+    </div>
+  
+    <div class="card-pill parent-pill" style="left:243px; top:922px;">
+      1 (1..1)
+    </div>
+    <div class="card-pill child-pill" style="left:1797px; top:1102px;">
+      N (0..N)
+    </div>
+    <div class="card-pill mid-pill" style="left:995px; top:1018px;">
+      recipient
+    </div>
+  
+    <div class="card-pill parent-pill" style="left:256px; top:512px;">
+      1 (1..1)
+    </div>
+    <div class="card-pill child-pill" style="left:1810px; top:822px;">
+      N (0..N)
+    </div>
+    <div class="card-pill mid-pill" style="left:1008px; top:673px;">
+      forecast_for
+    </div>
+  
+    <div class="card-pill parent-pill" style="left:229px; top:922px;">
+      0..1 (0..1)
+    </div>
+    <div class="card-pill child-pill" style="left:1783px; top:1422px;">
+      N (0..N)
+    </div>
+    <div class="card-pill mid-pill" style="left:981px; top:1178px;">
+      actor_audit
+    </div>
+  
+    <div class="card-pill parent-pill" style="left:242px; top:512px;">
+      0..1 (0..1)
+    </div>
+    <div class="card-pill child-pill" style="left:1796px; top:1422px;">
+      N (0..N)
+    </div>
+    <div class="card-pill mid-pill" style="left:994px; top:973px;">
+      facility_audit
+    </div>
+  
+
+</body>
+</html>
