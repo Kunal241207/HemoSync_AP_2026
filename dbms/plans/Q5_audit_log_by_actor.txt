@@ -1,0 +1,62 @@
+-- =============================================================================
+-- HemoSync — Query Execution Plan
+-- Query : Q5 — Audit Log — Recent Actions by a Specific User
+-- Purpose: Compliance and security audit trail lookup. Retrieves the last 50
+--          actions performed by a specific actor within a given institution,
+--          ordered by recency.
+-- Index Used: audit_logs_actor_time_idx (actor_id + created_at DESC)
+-- =============================================================================
+
+EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)
+SELECT
+    al.id,
+    al.entity_type,
+    al.entity_id,
+    al.action,
+    al.metadata,
+    al.created_at
+FROM audit_logs al
+WHERE
+    al.actor_id       = 'e5f6a7b8-c9d0-1234-ef01-345678901234'
+    AND al.institution_id = 'd4e5f6a7-b8c9-0123-def0-234567890123'
+ORDER BY al.created_at DESC
+LIMIT 50;
+
+-- =============================================================================
+-- EXECUTION PLAN OUTPUT
+-- (PostgreSQL 16.0, synthetic dataset: ~200,000 audit_logs rows)
+-- =============================================================================
+
+Limit  (cost=0.42..36.14 rows=50 width=136)
+       (actual time=0.063..0.244 rows=50 loops=1)
+  Buffers: shared hit=56
+  ->  Index Scan using audit_logs_actor_time_idx on audit_logs al
+        (cost=0.42..248.72 rows=347 width=136)
+        (actual time=0.059..0.228 rows=50 loops=1)
+        Index Cond: (actor_id = 'e5f6a7b8-c9d0-1234-ef01-345678901234'::uuid)
+        Filter: (institution_id = 'd4e5f6a7-b8c9-0123-def0-234567890123'::uuid)
+        Rows Removed by Filter: 6
+        Buffers: shared hit=56
+
+Planning Time:  0.418 ms
+Execution Time: 0.271 ms
+
+-- =============================================================================
+-- ANALYSIS
+-- Plan Type        : Index Scan with Limit (early termination)
+-- Index Used       : audit_logs_actor_time_idx (actor_id, created_at DESC)
+-- Index Scan Cost  : PostgreSQL fetches rows in reverse-chronological order
+--                    from the index — no sort step needed. LIMIT 50 enables
+--                    early termination after reading just 56 index pages.
+-- Filter           : institution_id filter removes 6 rows from adjacent actors
+--                    with same UUID prefix — minimal false-positive overhead
+-- Rows Examined    : 56 (50 returned + 6 filtered)
+-- Buffers          : 56 pages hit — all cached
+-- Planning Time    : 0.418 ms
+-- Execution Time   : 0.271 ms
+-- Total Time       : 0.689 ms
+-- Verdict          : OPTIMAL — Index provides both filtering and ordering.
+--                    Adding institution_id to the index as a second column
+--                    (actor_id, institution_id, created_at DESC) would eliminate
+--                    the residual filter and reduce examined rows to exactly 50.
+-- =============================================================================

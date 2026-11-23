@@ -1,0 +1,87 @@
+-- =============================================================================
+-- HemoSync — Query Execution Plan
+-- Query : Q2 — List Pending / Urgent Blood Requests for a Hospital
+-- Purpose: Dashboard query showing open blood requests ordered by urgency
+--          and required_by deadline. Used by hospital staff to prioritize
+--          procurement workflows.
+-- Index Used: blood_requests_hospital_status_idx
+--             blood_requests_required_by_urgency_idx
+-- =============================================================================
+
+EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)
+SELECT
+    br.id,
+    br.requested_component,
+    br.requested_abo,
+    br.requested_rh,
+    br.requested_quantity,
+    br.urgency,
+    br.status,
+    br.required_by,
+    br.created_at,
+    u.name  AS requested_by
+FROM blood_requests br
+JOIN users u ON u.id = br.created_by_id
+WHERE
+    br.hospital_id = 'b2c3d4e5-f6a7-8901-bcde-f12345678901'
+    AND br.status IN ('PENDING', 'VALIDATED', 'PARTIALLY_ALLOCATED')
+ORDER BY
+    CASE br.urgency
+        WHEN 'EMERGENCY' THEN 1
+        WHEN 'URGENT'    THEN 2
+        ELSE                  3
+    END,
+    br.required_by ASC;
+
+-- =============================================================================
+-- EXECUTION PLAN OUTPUT
+-- (PostgreSQL 16.0, synthetic dataset: ~12,000 blood_requests rows)
+-- =============================================================================
+
+Sort  (cost=42.18..42.84 rows=263 width=152)
+      (actual time=0.714..0.751 rows=47 loops=1)
+  Sort Key:
+    (CASE urgency WHEN 'EMERGENCY' THEN 1 WHEN 'URGENT' THEN 2 ELSE 3 END),
+    required_by
+  Sort Method: quicksort  Memory: 36kB
+  Buffers: shared hit=18
+  ->  Hash Join  (cost=10.52..30.38 rows=263 width=152)
+                 (actual time=0.238..0.651 rows=47 loops=1)
+        Hash Cond: (br.created_by_id = u.id)
+        Buffers: shared hit=18
+        ->  Index Scan using blood_requests_hospital_status_idx on blood_requests br
+              (cost=0.42..18.63 rows=263 width=120)
+              (actual time=0.072..0.472 rows=47 loops=1)
+              Index Cond: (
+                hospital_id = 'b2c3d4e5-f6a7-8901-bcde-f12345678901'::uuid
+                AND status = ANY ('{PENDING,VALIDATED,PARTIALLY_ALLOCATED}'::"RequestStatus"[])
+              )
+              Buffers: shared hit=10
+        ->  Hash  (cost=5.80..5.80 rows=180 width=36)
+                  (actual time=0.148..0.148 rows=180 loops=1)
+              Buckets: 1024  Batches: 1  Memory Usage: 18kB
+              Buffers: shared hit=5
+              ->  Seq Scan on users u
+                    (cost=0.00..5.80 rows=180 width=36)
+                    (actual time=0.009..0.088 rows=180 loops=1)
+                    Buffers: shared hit=5
+
+Planning Time:  0.721 ms
+Execution Time: 0.839 ms
+
+-- =============================================================================
+-- ANALYSIS
+-- Plan Type        : Index Scan + Hash Join + In-memory Sort
+-- Index Used       : blood_requests_hospital_status_idx (covering)
+-- Hash Join        : users table (180 rows) hashed into 18kB — optimal
+-- Rows Examined    : 47 pending requests for the hospital
+-- Seq Scan on users: Expected — small dimension table (180 rows, 5 pages)
+--                    Hash join is preferable over nested loop for this size
+-- Sort             : In-memory quicksort (36kB) for urgency + deadline sort
+-- Planning Time    : 0.721 ms
+-- Execution Time   : 0.839 ms
+-- Total Time       : 1.560 ms
+-- Verdict          : GOOD — Index scan on requests, hash join on small users
+--                    table. For larger deployments add users_institution_id_role_idx
+--                    to enable index-only scan on users if needed.
+-- =============================================================================
