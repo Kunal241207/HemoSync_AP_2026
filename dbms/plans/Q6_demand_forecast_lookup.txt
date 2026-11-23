@@ -1,0 +1,78 @@
+-- =============================================================================
+-- HemoSync — Query Execution Plan
+-- Query : Q6 — Demand Forecast Retrieval for Upcoming 7-Day Horizon
+-- Purpose: Intelligence dashboard — retrieves the latest demand forecast series
+--          for each blood component type at an institution for the next 7 days,
+--          ranked by most recently generated model run.
+-- Index Used: demand_forecasts_lookup_idx
+--             demand_forecasts_series_unique_idx (implicit ordering hint)
+-- =============================================================================
+
+EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)
+SELECT DISTINCT ON (df.component_type, df.abo_group, df.rh_factor)
+    df.component_type,
+    df.abo_group,
+    df.rh_factor,
+    df.forecast_date,
+    df.horizon_days,
+    df.predicted_demand,
+    df.lower_bound,
+    df.upper_bound,
+    df.model_version,
+    df.metrics,
+    df.generated_at
+FROM demand_forecasts df
+WHERE
+    df.institution_id  = 'd4e5f6a7-b8c9-0123-def0-234567890123'
+    AND df.horizon_days = 7
+    AND df.forecast_date >= CURRENT_DATE
+    AND df.forecast_date <  CURRENT_DATE + INTERVAL '7 days'
+ORDER BY
+    df.component_type, df.abo_group, df.rh_factor,
+    df.generated_at DESC;
+
+-- =============================================================================
+-- EXECUTION PLAN OUTPUT
+-- (PostgreSQL 16.0, synthetic dataset: ~15,000 demand_forecasts rows)
+-- =============================================================================
+
+Unique  (cost=48.14..52.38 rows=36 width=256)
+        (actual time=0.814..0.891 rows=12 loops=1)
+  Buffers: shared hit=28
+  ->  Sort  (cost=48.14..49.19 rows=420 width=256)
+            (actual time=0.808..0.832 rows=84 loops=1)
+        Sort Key: component_type, abo_group, rh_factor, generated_at DESC
+        Sort Method: quicksort  Memory: 44kB
+        Buffers: shared hit=28
+        ->  Index Scan using demand_forecasts_lookup_idx on demand_forecasts df
+              (cost=0.42..29.74 rows=420 width=256)
+              (actual time=0.072..0.618 rows=84 loops=1)
+              Index Cond: (
+                institution_id = 'd4e5f6a7-b8c9-0123-def0-234567890123'::uuid
+                AND horizon_days = 7
+                AND forecast_date >= CURRENT_DATE::timestamptz
+                AND forecast_date <  (CURRENT_DATE::timestamptz + '7 days'::interval)
+              )
+              Buffers: shared hit=28
+
+Planning Time:  0.638 ms
+Execution Time: 0.924 ms
+
+-- =============================================================================
+-- ANALYSIS
+-- Plan Type        : Index Scan + Sort + Unique (DISTINCT ON)
+-- Index Used       : demand_forecasts_lookup_idx
+--                    (institution_id, component_type, forecast_date, horizon_days)
+-- Rows Examined    : 84 forecast rows for the 7-day window (7 days × 12 blood types)
+-- DISTINCT ON      : Collapses to 12 unique (component_type, abo_group, rh_factor)
+--                    combinations, keeping latest generated_at per group
+-- Sort             : In-memory quicksort on 84 rows (44kB) — fast
+-- Planning Time    : 0.638 ms
+-- Execution Time   : 0.924 ms
+-- Total Time       : 1.562 ms
+-- Verdict          : GOOD — Composite index enables efficient range scan on
+--                    forecast_date with institution and horizon filtering.
+--                    The DISTINCT ON + Sort pattern is PostgreSQL's standard
+--                    top-N-per-group plan; for high-frequency dashboards consider
+--                    a materialized view refreshed on each forecast model run.
+-- =============================================================================
