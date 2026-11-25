@@ -1,6 +1,7 @@
 -- HemoSync queries. PostgreSQL 16+.
 
 -- Q01: Available inventory (FEFO)
+-- READ
 SELECT
     bu."unit_code",
     i."name" AS "institution_name",
@@ -20,6 +21,7 @@ WHERE bu."inventory_status" = 'AVAILABLE'
 ORDER BY bu."expiry_date" ASC, bu."created_at" ASC;
 
 -- Q02: Inventory summary by institution and blood type
+-- READ
 SELECT
     i."id" AS "institution_id",
     i."name" AS "institution_name",
@@ -46,6 +48,7 @@ GROUP BY
 ORDER BY i."name", bu."component_type", bu."abo_group", bu."rh_factor";
 
 -- Q03: Open requests by clinical priority
+-- READ
 SELECT
     br."id" AS "request_id",
     hospital."name" AS "hospital_name",
@@ -73,6 +76,7 @@ ORDER BY
     br."required_by" ASC;
 
 -- Q04: Request fulfilment and remaining quantity
+-- READ
 SELECT
     br."id" AS "request_id",
     hospital."name" AS "hospital_name",
@@ -97,6 +101,7 @@ GROUP BY
 ORDER BY "remaining_quantity" DESC, br."id";
 
 -- Q05: Allocation audit trail
+-- READ
 SELECT
     a."id" AS "allocation_id",
     a."status" AS "allocation_status",
@@ -121,6 +126,7 @@ JOIN "users" AS allocator
 ORDER BY a."created_at" DESC;
 
 -- Q06: Transfer manifest and logistics status
+-- READ
 SELECT
     t."id" AS "transfer_id",
     source_i."name" AS "source_institution",
@@ -153,6 +159,7 @@ GROUP BY
 ORDER BY t."created_at" DESC;
 
 -- Q07: Unresolved expiry alerts
+-- READ
 SELECT
     ea."id" AS "alert_id",
     i."name" AS "institution_name",
@@ -180,6 +187,7 @@ ORDER BY
     bu."expiry_date";
 
 -- Q08: Latest forecast by institution, component, and blood type
+-- READ
 SELECT DISTINCT ON (
     df."institution_id",
     df."component_type",
@@ -209,6 +217,7 @@ ORDER BY
     df."generated_at" DESC;
 
 -- Q09: Institution workload and fulfilment rate
+-- READ
 SELECT
     i."id" AS "hospital_id",
     i."name" AS "hospital_name",
@@ -231,6 +240,7 @@ GROUP BY i."id", i."name"
 ORDER BY "open_requests" DESC, "fulfilment_rate_percent" NULLS LAST;
 
 -- Q10: Inventory status distribution
+-- READ
 WITH statuses AS (
     SELECT unnest(enum_range(NULL::"InventoryStatus")) AS "inventory_status"
 )
@@ -247,6 +257,7 @@ GROUP BY i."name", s."inventory_status"
 ORDER BY i."name", s."inventory_status";
 
 -- Q11: Forecast demand versus eligible inventory
+-- READ
 WITH latest_forecasts AS (
     SELECT DISTINCT ON (
         "institution_id",
@@ -301,6 +312,7 @@ ORDER BY "projected_shortage" DESC, i."name", lf."component_type",
          lf."abo_group", lf."rh_factor";
 
 -- Q12: FEFO rank by institution and blood type
+-- READ
 SELECT
     bu."unit_code",
     i."name" AS "institution_name",
@@ -325,6 +337,7 @@ WHERE bu."inventory_status" = 'AVAILABLE'
   AND bu."expiry_date" > CURRENT_TIMESTAMP;
 
 -- Q13: Anomaly review queue
+-- READ
 SELECT
     ae."id" AS "anomaly_id",
     i."name" AS "institution_name",
@@ -349,6 +362,7 @@ WHERE ae."status" IN ('OPEN', 'ACKNOWLEDGED')
 ORDER BY ae."date" DESC, ae."created_at" DESC;
 
 -- Q14: Daily audit activity
+-- READ
 SELECT
     COALESCE(i."name", 'Platform-wide') AS "institution_name",
     DATE_TRUNC('day', al."created_at") AS "activity_day",
@@ -365,6 +379,7 @@ GROUP BY
 ORDER BY "activity_day" DESC, "institution_name";
 
 -- Q15: Data-integrity exceptions
+-- READ
 SELECT
     'AVAILABLE_UNIT_WITHOUT_RELEASE' AS "exception_type",
     bu."id"::TEXT AS "record_id",

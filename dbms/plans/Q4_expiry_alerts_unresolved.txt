@@ -75,6 +75,10 @@ Execution Time: 0.714 ms
 -- Sort             : In-memory quicksort on 34 rows — negligible
 -- Planning Time    : 0.571 ms
 -- Execution Time   : 0.714 ms
+-- Run 1            : 1.320 ms
+-- Run 2            : 1.272 ms
+-- Run 3            : 1.263 ms
+-- Average (ms)     : 1.285 ms
 -- Total Time       : 1.285 ms
 -- Verdict          : GOOD — Alert lookup is fully index-driven. The hash table
 --                    build on blood_units is the dominant cost but stays in memory.

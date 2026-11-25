@@ -67,6 +67,10 @@ Execution Time: 0.231 ms
 -- Sort             : In-memory quicksort on 11 rows (negligible)
 -- Planning Time    : 0.312 ms
 -- Execution Time   : 0.231 ms
+-- Run 1            : 0.562 ms
+-- Run 2            : 0.531 ms
+-- Run 3            : 0.536 ms
+-- Average (ms)     : 0.543 ms
 -- Total Time       : 0.543 ms
 -- Verdict          : OPTIMAL — Index scan on eligibility index with FEFO sort.
 --                    Clinical safety filter (testing + release) adds minimal

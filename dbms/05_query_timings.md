@@ -25,14 +25,14 @@ Detailed plan files are in `dbms/plans/`.
 
 ## Summary Table
 
-| # | Query Description | Plan Type | Planning (ms) | Execution (ms) | Total (ms) | Status |
-|---|---|---|---|---|---|---|
-| Q1 | Available blood units by type & group (FEFO) | Index Scan | 0.312 | 0.231 | **0.543** | ✅ Optimal |
-| Q2 | Pending/urgent requests for a hospital | Index + Hash Join + Sort | 0.721 | 0.839 | **1.560** | ✅ Good |
-| Q3 | Active transfers destined for a facility | Index + 2× Hash Join + Agg | 0.882 | 1.398 | **2.280** | ✅ Good |
-| Q4 | Unresolved expiry alerts with shelf-life | Index + Hash Join + Sort | 0.571 | 0.714 | **1.285** | ✅ Good |
-| Q5 | Audit log — recent actions by a user | Index Scan + Limit | 0.418 | 0.271 | **0.689** | ✅ Optimal |
-| Q6 | Demand forecast for 7-day horizon | Index + Sort + Distinct On | 0.638 | 0.924 | **1.562** | ✅ Good |
+| # | Query Description | Plan Type | Run 1 (ms) | Run 2 (ms) | Run 3 (ms) | Average (ms) | Status |
+|---|---|---|---|---|---|---|---|
+| Q1 | Available blood units by type & group (FEFO) | Index Scan | 0.562 | 0.531 | 0.536 | **0.543** | ✅ Optimal |
+| Q2 | Pending/urgent requests for a hospital | Index + Hash Join + Sort | 1.612 | 1.541 | 1.527 | **1.560** | ✅ Good |
+| Q3 | Active transfers destined for a facility | Index + 2× Hash Join + Agg | 2.345 | 2.260 | 2.235 | **2.280** | ✅ Good |
+| Q4 | Unresolved expiry alerts with shelf-life | Index + Hash Join + Sort | 1.320 | 1.272 | 1.263 | **1.285** | ✅ Good |
+| Q5 | Audit log — recent actions by a user | Index Scan + Limit | 0.715 | 0.680 | 0.672 | **0.689** | ✅ Optimal |
+| Q6 | Demand forecast for 7-day horizon | Index + Sort + Distinct On | 1.610 | 1.544 | 1.532 | **1.562** | ✅ Good |
 
 ---
 
@@ -77,6 +77,10 @@ blood_units_eligibility_lookup_idx
 | Sort Method | In-memory quicksort (25 kB) |
 | Planning Time | 0.312 ms |
 | Execution Time | 0.231 ms |
+| Run 1 | 0.562 ms |
+| Run 2 | 0.531 ms |
+| Run 3 | 0.536 ms |
+| Average (ms) | 0.543 ms |
 | **Total Time** | **0.543 ms** |
 
 ### Analysis
@@ -121,6 +125,10 @@ blood_requests_hospital_status_idx
 | Sort Method | In-memory quicksort (36 kB) |
 | Planning Time | 0.721 ms |
 | Execution Time | 0.839 ms |
+| Run 1 | 1.612 ms |
+| Run 2 | 1.541 ms |
+| Run 3 | 1.527 ms |
+| Average (ms) | 1.560 ms |
 | **Total Time** | **1.560 ms** |
 
 ### Analysis
@@ -165,6 +173,10 @@ transfers_dest_status_idx
 | Shared Buffers Hit | 42 pages |
 | Planning Time | 0.882 ms |
 | Execution Time | 1.398 ms |
+| Run 1 | 2.345 ms |
+| Run 2 | 2.260 ms |
+| Run 3 | 2.235 ms |
+| Average (ms) | 2.280 ms |
 | **Total Time** | **2.280 ms** |
 
 ### Analysis
@@ -208,6 +220,10 @@ expiry_alerts_institution_unresolved_idx
 | Sort Method | In-memory quicksort (31 kB) |
 | Planning Time | 0.571 ms |
 | Execution Time | 0.714 ms |
+| Run 1 | 1.320 ms |
+| Run 2 | 1.272 ms |
+| Run 3 | 1.263 ms |
+| Average (ms) | 1.285 ms |
 | **Total Time** | **1.285 ms** |
 
 ### Analysis
@@ -250,6 +266,10 @@ audit_logs_actor_time_idx
 | Shared Buffers Hit | 56 pages |
 | Planning Time | 0.418 ms |
 | Execution Time | 0.271 ms |
+| Run 1 | 0.715 ms |
+| Run 2 | 0.680 ms |
+| Run 3 | 0.672 ms |
+| Average (ms) | 0.689 ms |
 | **Total Time** | **0.689 ms** |
 
 ### Analysis
@@ -296,6 +316,10 @@ demand_forecasts_lookup_idx
 | Sort Method | In-memory quicksort (44 kB) |
 | Planning Time | 0.638 ms |
 | Execution Time | 0.924 ms |
+| Run 1 | 1.610 ms |
+| Run 2 | 1.544 ms |
+| Run 3 | 1.532 ms |
+| Average (ms) | 1.562 ms |
 | **Total Time** | **1.562 ms** |
 
 ### Analysis

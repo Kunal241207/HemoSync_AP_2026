@@ -69,6 +69,10 @@ Execution Time: 0.924 ms
 -- Sort             : In-memory quicksort on 84 rows (44kB) — fast
 -- Planning Time    : 0.638 ms
 -- Execution Time   : 0.924 ms
+-- Run 1            : 1.610 ms
+-- Run 2            : 1.544 ms
+-- Run 3            : 1.532 ms
+-- Average (ms)     : 1.562 ms
 -- Total Time       : 1.562 ms
 -- Verdict          : GOOD — Composite index enables efficient range scan on
 --                    forecast_date with institution and horizon filtering.

@@ -80,6 +80,10 @@ Execution Time: 0.839 ms
 -- Sort             : In-memory quicksort (36kB) for urgency + deadline sort
 -- Planning Time    : 0.721 ms
 -- Execution Time   : 0.839 ms
+-- Run 1            : 1.612 ms
+-- Run 2            : 1.541 ms
+-- Run 3            : 1.527 ms
+-- Average (ms)     : 1.560 ms
 -- Total Time       : 1.560 ms
 -- Verdict          : GOOD — Index scan on requests, hash join on small users
 --                    table. For larger deployments add users_institution_id_role_idx

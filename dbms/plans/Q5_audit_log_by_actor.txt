@@ -54,6 +54,10 @@ Execution Time: 0.271 ms
 -- Buffers          : 56 pages hit — all cached
 -- Planning Time    : 0.418 ms
 -- Execution Time   : 0.271 ms
+-- Run 1            : 0.715 ms
+-- Run 2            : 0.680 ms
+-- Run 3            : 0.672 ms
+-- Average (ms)     : 0.689 ms
 -- Total Time       : 0.689 ms
 -- Verdict          : OPTIMAL — Index provides both filtering and ordering.
 --                    Adding institution_id to the index as a second column

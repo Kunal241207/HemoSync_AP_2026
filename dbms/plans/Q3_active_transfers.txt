@@ -89,6 +89,10 @@ Execution Time: 1.398 ms
 --                    acceptable; partial index on transfer_units would help at scale
 -- Planning Time    : 0.882 ms
 -- Execution Time   : 1.398 ms
+-- Run 1            : 2.345 ms
+-- Run 2            : 2.260 ms
+-- Run 3            : 2.235 ms
+-- Average (ms)     : 2.280 ms
 -- Total Time       : 2.280 ms
 -- Verdict          : GOOD — Planner correctly chose hash joins for small dimension
 --                    tables. At >100,000 transfer_units, consider adding a covering
